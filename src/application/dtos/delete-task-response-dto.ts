@@ -1,0 +1,3 @@
+interface DeleteTaskResponseDTO {
+  message: string;
+}
