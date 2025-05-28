@@ -28,8 +28,6 @@ services:
   mongo:
     image: mongo:6
     container_name: mongodb-todo-list
-    ports:
-      - "27017:27017"
     volumes:
       - mongo-data:/data/db
     networks:
@@ -41,4 +39,4 @@ volumes:
 
 networks:
   backend:
-    name: rede-backend
+    name: todo-network
