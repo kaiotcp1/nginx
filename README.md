@@ -1,11 +1,11 @@
-```markdown
-# 🧪 Clean Architecture Todo API
-
 ![Node.js](https://img.shields.io/badge/Node.js-22.x-brightgreen)
 ![TypeScript](https://img.shields.io/badge/TypeScript-blue)
 ![Docker](https://img.shields.io/badge/Docker-🛳️-blue)
 ![MongoDB](https://img.shields.io/badge/MongoDB-4EA94B?logo=mongodb&logoColor=white)
 ![AWS](https://img.shields.io/badge/AWS-Amazon_Web_Services-FF9900?logo=amazonaws&logoColor=white)
+
+```markdown
+# 🧪 Clean Architecture Todo API
 
 Uma aplicação de estudo construída com foco em aprender os fundamentos de **Clean Architecture**, **DDD**, **Docker**, **Nginx (reverse proxy)** e práticas modernas com Node.js + TypeScript.
 
@@ -207,5 +207,3 @@ Se você quiser trocar ideias, colaborar ou apenas bater um papo sobre arquitetu
 
 Feito com 💙 por um estudante de Engenharia de Software.
 ```
-
-Este README está completo e pronto para ser copiado e usado no seu projeto!
