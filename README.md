@@ -3,10 +3,11 @@
 ![Docker](https://img.shields.io/badge/Docker-🛳️-blue)
 ![MongoDB](https://img.shields.io/badge/MongoDB-4EA94B?logo=mongodb&logoColor=white)
 ![AWS](https://img.shields.io/badge/AWS-Amazon_Web_Services-FF9900?logo=amazonaws&logoColor=white)
+![SSL](https://img.shields.io/badge/SSL-Let's_Encrypt-0066CC?logo=letsencrypt&logoColor=white)
 
 # 🧪 Clean Architecture Todo API
 
-Uma aplicação de estudo construída com foco em aprender os fundamentos de **Clean Architecture**, **DDD**, **Docker**, **Nginx (reverse proxy)** e práticas modernas com Node.js + TypeScript.
+Uma aplicação de estudo construída com foco em aprender os fundamentos de **Clean Architecture**, **DDD**, **Docker**, **Nginx (reverse proxy)**, **SSL/HTTPS com Let's Encrypt** e práticas modernas com Node.js + TypeScript.
 
 ---
 
@@ -64,7 +65,7 @@ A aplicação estará disponível em: [http://localhost](http://localhost)
 2.  Configure o Security Group da EC2:
     *   Permita tráfego SSH (porta 22) do seu IP.
     *   Permita tráfego HTTP (porta 80) de 0.0.0.0/0 (qualquer IP).
-    *   Permita tráfego HTTPS (porta 443) de 0.0.0.0/0 (qualquer IP) Caso tenha configurado o certificado SSL.
+    *   Permita tráfego HTTPS (porta 443) de 0.0.0.0/0 (qualquer IP).
 3.  Conecte-se à instância via SSH.
 4.  Instale o Docker e Docker Compose:
 
@@ -77,7 +78,7 @@ A aplicação estará disponível em: [http://localhost](http://localhost)
     newgrp docker
     ```
 
-5.  Configure o Firewall (UFW):
+5.  Configure o Firewall (UFW): ***Não Obrigatório***
 
     ```bash
     sudo apt update
@@ -105,10 +106,108 @@ A aplicação estará disponível em: [http://localhost](http://localhost)
 
 ---
 
+## 🔒 Configuração de Domínio e SSL/HTTPS
+
+### 🌐 Configuração do Domínio
+
+Para usar um domínio personalizado com certificado SSL gratuito:
+
+1. **Adquira um domínio** (ex: em provedores como Hostinger, GoDaddy, etc.)
+
+2. **Configure os registros DNS:**
+   ```
+   Tipo: A
+   Nome: @
+   Valor: IP_PUBLICO_DA_SUA_EC2
+   TTL: 3600
+
+   Tipo: CNAME
+   Nome: www
+   Valor: seudominio.com
+   TTL: 3600
+   ```
+
+3. **Aguarde a propagação DNS** (pode levar até 24 horas)
+
+### 🔐 Certificado SSL com Let's Encrypt
+
+O projeto utiliza **Let's Encrypt** para certificados SSL gratuitos e **Certbot** para automação:
+
+#### 1. Obter Certificado SSL
+
+```bash
+# Certifique-se de que a aplicação está rodando
+docker-compose up -d
+
+# Obter certificado (substitua por seu domínio e email)
+docker-compose run --rm certbot certonly --webroot \
+  --webroot-path=/var/www/certbot \
+  --email seu-email@exemplo.com \
+  --agree-tos --no-eff-email \
+  -d seudominio.com -d www.seudominio.com
+```
+
+#### 2. Ativar HTTPS no Nginx
+
+Após obter o certificado, o nginx automaticamente:
+- ✅ Redireciona HTTP → HTTPS
+- ✅ Configura TLS 1.2/1.3 moderno
+- ✅ Adiciona headers de segurança HTTPS
+- ✅ Habilita HTTP/2
+
+#### 3. Renovação Automática
+
+**Criar script de renovação:**
+```bash
+# Criar script
+cat > renew-ssl.sh << 'EOF'
+#!/bin/bash
+cd /home/ubuntu/todoapp
+docker-compose run --rm certbot renew --quiet
+if [ $? -eq 0 ]; then
+    docker-compose exec nginx nginx -s reload
+fi
+EOF
+
+chmod +x renew-ssl.sh
+```
+
+**Configurar cron job:**
+```bash
+sudo crontab -e
+
+# Adicionar linha para execução diária às 2h:
+0 2 * * * /home/ubuntu/todoapp/renew-ssl.sh >> /var/log/ssl-renewal.log 2>&1
+```
+
+#### 4. Verificações de SSL
+
+```bash
+# Testar HTTPS
+curl -I https://seudominio.com
+
+# Verificar certificado
+echo | openssl s_client -servername seudominio.com -connect seudominio.com:443 2>/dev/null | openssl x509 -noout -dates
+
+# Ver certificados instalados
+docker-compose run --rm certbot certificates
+```
+
+### 🛡️ Recursos de Segurança HTTPS
+
+- **TLS 1.2/1.3:** Protocolos modernos de criptografia
+- **HSTS:** Força conexões HTTPS no navegador
+- **HTTP/2:** Protocolo mais eficiente
+- **Certificado válido por 90 dias** com renovação automática
+- **Redirecionamento automático** HTTP → HTTPS
+
+---
+
 ## 🔄 Usando Nginx como Proxy Reverso
 
 - Nginx é usado para rotear as requisições externas para o container da API.
-- Ele recebe requisições HTTP na porta 80 e as repassa para o serviço `api` na porta 3000.
+- Ele recebe requisições HTTP/HTTPS e as repassa para o serviço `api` na porta 3000.
+- Atua como terminador SSL, descriptografando HTTPS antes de enviar para a API.
 
 ### 💡 O que é Proxy Reverso?
 
@@ -117,12 +216,13 @@ A aplicação estará disponível em: [http://localhost](http://localhost)
 - Balanceamento de carga
 - Encapsulamento do backend
 - Cache, compressão e HTTPS
+- Terminação SSL/TLS
 
 ---
 
 ## 🛡️ Configurações de Segurança no Nginx
 
-O projeto implementa diversas práticas recomendadas de segurança no proxy reverso Nginx, visando proteger a aplicação contra ataques comuns e garantir maior robustez em ambientes de produção ou estudo que é o caso destá aplicação.
+O projeto implementa diversas práticas recomendadas de segurança no proxy reverso Nginx, visando proteger a aplicação contra ataques comuns e garantir maior robustez em ambientes de produção ou estudo que é o caso desta aplicação.
 
 ### Principais configurações aplicadas:
 
@@ -140,6 +240,7 @@ O projeto implementa diversas práticas recomendadas de segurança no proxy reve
     add_header X-Content-Type-Options "nosniff";
     add_header X-XSS-Protection "1; mode=block";
     add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; img-src 'self' data:;";
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
     ```
 
 - **Limite de tamanho de upload:**
@@ -172,6 +273,14 @@ O projeto implementa diversas práticas recomendadas de segurança no proxy reve
     }
     ```
 
+- **Configurações SSL/TLS modernas:**
+  Implementa protocolos e cifras seguras para HTTPS.
+    ```nginx
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384;
+    ssl_prefer_server_ciphers off;
+    ```
+
 ## 🧠 Conceitos Aplicados
 
 - ✅ Clean Architecture
@@ -182,8 +291,11 @@ O projeto implementa diversas práticas recomendadas de segurança no proxy reve
 - ✅ DTOs e Presenters
 - ✅ Docker e Docker Compose
 - ✅ Nginx como proxy reverso com práticas de segurança
+- ✅ SSL/TLS com Let's Encrypt
+- ✅ Renovação automática de certificados
 - ✅ AWS EC2
 - ✅ Firewall (UFW)
+- ✅ DNS e domínios personalizados
 
 ---
 
@@ -205,4 +317,3 @@ Se você quiser trocar ideias, colaborar ou apenas bater um papo sobre arquitetu
 ## 👨‍💻 Autor
 
 Feito com 💙 por um estudante de Engenharia de Software.
-```
