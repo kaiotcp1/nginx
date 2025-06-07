@@ -2,6 +2,7 @@
 ![TypeScript](https://img.shields.io/badge/TypeScript-blue)
 ![Docker](https://img.shields.io/badge/Docker-🛳️-blue)
 ![MongoDB](https://img.shields.io/badge/MongoDB-4EA94B?logo=mongodb&logoColor=white)
+![Oracle Cloud](https://img.shields.io/badge/Oracle_Cloud-Free_Tier-F80000?logo=oracle)
 ![AWS](https://img.shields.io/badge/AWS-Amazon_Web_Services-FF9900?logo=amazonaws&logoColor=white)
 ![SSL](https://img.shields.io/badge/SSL-Let's_Encrypt-0066CC?logo=letsencrypt&logoColor=white)
 
@@ -59,107 +60,138 @@ A aplicação estará disponível em: [http://localhost](http://localhost)
 
 ---
 
-## 🚀 Deploy na AWS EC2
+## ☁️ Deploy em Cloud (AWS EC2 ou Oracle Cloud)
 
-1.  Crie uma instância EC2 com Ubuntu Server 24.04 LTS (t2.micro para o free tier).
-2.  Configure o Security Group da EC2:
-    *   Permita tráfego SSH (porta 22) do seu IP.
-    *   Permita tráfego HTTP (porta 80) de 0.0.0.0/0 (qualquer IP).
-    *   Permita tráfego HTTPS (porta 443) de 0.0.0.0/0 (qualquer IP).
-3.  Conecte-se à instância via SSH.
-4.  Instale o Docker e Docker Compose:
+### 1. **Criando a VM**
 
-    ```bash
-    sudo apt update
-    sudo apt upgrade -y
-    sudo apt install docker.io -y
-    sudo apt install docker-compose -y
-    sudo usermod -aG docker $USER
-    newgrp docker
-    ```
+- **AWS EC2:** Crie uma instância `Ubuntu 24.04 LTS` (`t2.micro para free tier`).
+- **Oracle Cloud:** Crie uma VM `VM.Standard.E2.1.Micro` (free tier) com Ubuntu 24.04 LTS.
 
-5.  Configure o Firewall (UFW): ***Não Obrigatório***
+### 2. **Configuração de Rede**
 
-    ```bash
-    sudo apt update
-    sudo apt install ufw -y
-    sudo ufw allow 80
-    sudo ufw allow 443
-    sudo ufw enable
-    sudo ufw status
-    ```
+- **Porta 22 (SSH):** Libere apenas para o seu IP.
+- **Portas 80 e 443:** Libere para 0.0.0.0/0 (acesso público).
+- **No Ubuntu:**  ***Não obrigatório para teste*** | ***Cuidado bloquear o acesso a maquina pela porta 22***
+  ```bash
+  sudo ufw allow 22
+  sudo ufw allow 80
+  sudo ufw allow 443
+  sudo ufw enable
+  ```
 
-6.  Copie os arquivos do projeto para a instância:
+### 3. **Instale Docker e Docker Compose**
 
-    ```bash
-    scp -i "sua-chave.pem ou .pkk" -r docker-compose.yml Dockerfile package.json package-lock.json tsconfig.json nginx src ubuntu@<ip-da-ec2>:/home/ubuntu/todoapp/
-    ```
+```bash
+sudo apt update
+sudo apt upgrade -y
+sudo apt install docker.io -y
+sudo apt install docker-compose -y
+sudo usermod -aG docker $USER
+newgrp docker
+```
 
-7.  Suba a aplicação com Docker Compose:
+### 4. **Copie os arquivos do projeto para a VM**
 
-    ```bash
-    cd /home/ubuntu/todoapp
-    docker-compose up -d --build
-    ```
+No seu computador local:
 
-8.  Acesse a aplicação no navegador: `http://<ip-da-ec2>`
+```bash
+scp -i "sua-chave.key" -r docker-compose.yml Dockerfile package.json package-lock.json tsconfig.json nginx src ubuntu@<ip-da-vm>:/home/ubuntu/todoapp/
+```
 
 ---
 
 ## 🔒 Configuração de Domínio e SSL/HTTPS
 
-### 🌐 Configuração do Domínio
+### 1. **Configuração do Domínio**
 
-Para usar um domínio personalizado com certificado SSL gratuito:
+- Adquira um domínio (Hostinger, GoDaddy, etc).
+- Configure o DNS:
+  ```
+  Tipo: A
+  Nome: @
+  Valor: IP_PUBLICO_DA_VM
+  TTL: 3600
 
-1. **Adquira um domínio** (ex: em provedores como Hostinger, GoDaddy, etc.)
+  Tipo: CNAME
+  Nome: www
+  Valor: seudominio.com
+  TTL: 3600
+  ```
+- Aguarde a propagação DNS (pode levar até 24h).
 
-2. **Configure os registros DNS:**
+---
+
+### 2. **Emissão do Certificado SSL (Let's Encrypt)**
+
+#### **Passo a passo seguro:**
+
+1. **Crie a pasta de validação no host:**
+   ```bash
+   sudo mkdir -p /var/www/certbot
+   sudo chown 1000:1000 /var/www/certbot
    ```
-   Tipo: A
-   Nome: @
-   Valor: IP_PUBLICO_DA_SUA_EC2
-   TTL: 3600
 
-   Tipo: CNAME
-   Nome: www
-   Valor: seudominio.com
-   TTL: 3600
+2. **Ajuste temporário no nginx.conf:**
+   - **Remova ou comente o bloco HTTPS (porta 443)**
+   - **Remova o redirecionamento de HTTP para HTTPS**
+   - Deixe apenas o bloco:
+     ```nginx
+     server {
+         listen 80;
+         server_name seudominio.com www.seudominio.com;
+
+         location /.well-known/acme-challenge/ {
+             root /var/www/certbot;
+             try_files $uri =404;
+         }
+
+         location / {
+             return 200 'ok';
+             add_header Content-Type text/plain;
+         }
+     }
+     ```
+
+3. **Reinicie o nginx:**
+   ```bash
+   docker-compose down
+   docker-compose up -d
    ```
 
-3. **Aguarde a propagação DNS** (pode levar até 24 horas)
+4. **Teste o acesso externo:** | **Não obrigatório**
+   ```bash
+   curl http://seudominio.com/.well-known/acme-challenge/teste.txt
+   ```
 
-### 🔐 Certificado SSL com Let's Encrypt
+5. **Emita o certificado:**
+   ```bash
+   docker-compose run --rm certbot certonly --webroot \
+     --webroot-path=/var/www/certbot \
+     --email seu-email@exemplo.com \
+     --agree-tos --no-eff-email \
+     -d seudominio.com -d www.seudominio.com
+   ```
 
-O projeto utiliza **Let's Encrypt** para certificados SSL gratuitos e **Certbot** para automação:
+6. **Volte o nginx.conf para a configuração com HTTPS e redirecionamento:**
+   - Reative o bloco HTTPS (porta 443)
+   - Reative o redirecionamento HTTP → HTTPS
 
-#### 1. Obter Certificado SSL
+7. **Reinicie o nginx novamente:**
+   ```bash
+   docker-compose down
+   docker-compose up -d
+   ```
+
+8. **Acesse sua aplicação em:**
+   [https://seudominio.com](https://seudominio.com)
+
+---
+
+### 3. **Renovação Automática do Certificado**
+
+Crie um script de renovação:
 
 ```bash
-# Certifique-se de que a aplicação está rodando
-docker-compose up -d
-
-# Obter certificado (substitua por seu domínio e email)
-docker-compose run --rm certbot certonly --webroot \
-  --webroot-path=/var/www/certbot \
-  --email seu-email@exemplo.com \
-  --agree-tos --no-eff-email \
-  -d seudominio.com -d www.seudominio.com
-```
-
-#### 2. Ativar HTTPS no Nginx
-
-Após obter o certificado, o nginx automaticamente:
-- ✅ Redireciona HTTP → HTTPS
-- ✅ Configura TLS 1.2/1.3 moderno
-- ✅ Adiciona headers de segurança HTTPS
-- ✅ Habilita HTTP/2
-
-#### 3. Renovação Automática
-
-**Criar script de renovação:**
-```bash
-# Criar script
 cat > renew-ssl.sh << 'EOF'
 #!/bin/bash
 cd /home/ubuntu/todoapp
@@ -172,27 +204,15 @@ EOF
 chmod +x renew-ssl.sh
 ```
 
-**Configurar cron job:**
+Adicione ao cron:
+
 ```bash
 sudo crontab -e
-
-# Adicionar linha para execução diária às 2h:
+# Adicione:
 0 2 * * * /home/ubuntu/todoapp/renew-ssl.sh >> /var/log/ssl-renewal.log 2>&1
 ```
 
-#### 4. Verificações de SSL
-
-```bash
-# Testar HTTPS
-curl -I https://seudominio.com
-
-# Verificar certificado
-echo | openssl s_client -servername seudominio.com -connect seudominio.com:443 2>/dev/null | openssl x509 -noout -dates
-
-# Ver certificados instalados
-docker-compose run --rm certbot certificates
-```
-
+---
 ### 🛡️ Recursos de Segurança HTTPS
 
 - **TLS 1.2/1.3:** Protocolos modernos de criptografia
@@ -294,6 +314,7 @@ O projeto implementa diversas práticas recomendadas de segurança no proxy reve
 - ✅ SSL/TLS com Let's Encrypt
 - ✅ Renovação automática de certificados
 - ✅ AWS EC2
+- ✅ Oracle Cloud
 - ✅ Firewall (UFW)
 - ✅ DNS e domínios personalizados
 
