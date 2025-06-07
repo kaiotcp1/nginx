@@ -39,6 +39,133 @@ src/
     └── express-server.ts  # Inicialização do servidor Express
 ```
 
+### Rotas da API
+Esta API RESTful permite criar, listar, buscar e deletar tarefas. Todas as rotas estão sob o prefixo `/v1/tasks`.
+## 🔎 Health Check
+
+- **GET** `/v1/health`
+  Verifica se a API está online.
+
+  **Resposta:**
+  ```json
+  { "status": "ok" }
+  ```
+
+---
+
+## 📝 Criar Tarefa
+
+- **POST** `/v1/tasks`
+  Cria uma nova tarefa.
+
+  **Body:**
+  ```json
+  {
+    "title": "Minha nova tarefa",
+    "completed": false
+  }
+  ```
+
+  **Resposta (201):**
+  ```json
+  {
+    "message": "Task created successfully",
+    "task": {
+      "title": "Minha nova tarefa",
+      "completed": false
+    }
+  }
+  ```
+
+---
+
+## 📋 Listar Todas as Tarefas
+
+- **GET** `/v1/tasks`
+  Retorna todas as tarefas cadastradas.
+
+  **Resposta (200):**
+  ```json
+  [
+    {
+      "id": "uuid-da-tarefa",
+      "title": "Minha nova tarefa",
+      "completed": false
+    }
+    // ...
+  ]
+  ```
+
+---
+
+## 🔍 Buscar Tarefa por ID
+
+- **GET** `/v1/tasks/:id`
+  Retorna uma tarefa específica pelo ID.
+
+  **Resposta (200):**
+  ```json
+  {
+    "id": "uuid-da-tarefa",
+    "title": "Minha nova tarefa",
+    "completed": false
+  }
+  ```
+
+  **Erro (404):**
+  ```json
+  { "error": "Task with id \"...\" not found" }
+  ```
+
+---
+
+## 🗑️ Deletar Tarefa por ID
+
+- **DELETE** `/v1/tasks/:id`
+  Remove uma tarefa pelo ID.
+
+  **Resposta (200):**
+  ```json
+  { "message": "Task deleted successfully" }
+  ```
+
+  **Erro (404):**
+  ```json
+  { "error": "Task not found" }
+  ```
+
+---
+
+## ⚠️ Erros Comuns
+
+- **400 Bad Request:** Dados inválidos (ex: título muito curto)
+- **404 Not Found:** Tarefa não encontrada
+
+---
+
+## Exemplos de uso com `curl`
+
+```bash
+# Criar tarefa
+curl -X POST https://seudominio.com/v1/tasks -H "Content-Type: application/json" -d '{"title":"Estudar Clean Architecture"}'
+
+# Listar tarefas
+curl https://seudominio.com/v1/tasks
+
+# Buscar tarefa por ID
+curl https://seudominio.com/v1/tasks/<id>
+
+# Deletar tarefa por ID
+curl -X DELETE https://seudominio.com/v1/tasks/<id>
+```
+
+---
+
+> Todas as respostas são em JSON.
+> Para dúvidas ou sugestões, consulte o código ou entre em contato!
+
+---
+
 ---
 
 ## 🚀 Como rodar com Docker
